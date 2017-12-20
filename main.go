@@ -15,6 +15,7 @@ import (
 // Wallet holds all the currencies
 type Wallet struct {
 	BTC Currency
+	BCH Currency
 	ETH Currency
 	XRP Currency
 }
@@ -43,7 +44,7 @@ func main() {
 
 	api := krakenapi.New(os.Getenv("KRAKEN_API_KEY"), os.Getenv("KRAKEN_PRIVATE_KEY"))
 
-	ticker, err := api.Ticker(krakenapi.XXBTZEUR, krakenapi.XETHZEUR, krakenapi.XXRPZEUR)
+	ticker, err := api.Ticker(krakenapi.XXBTZEUR, krakenapi.BCHEUR, krakenapi.XETHZEUR, krakenapi.XXRPZEUR)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -68,6 +69,7 @@ func main() {
 	fmt.Printf(" Cur. │ Current price │ Potential gain \n")
 	fmt.Printf("──────┼───────────────┼────────────────\n")
 	fmt.Printf(" BTC  │ %13.2f │ %14.2f \n", w.BTC.Ask, w.BTC.Potential)
+	fmt.Printf(" BCH  │ %13.2f │ %14.2f \n", w.BCH.Ask, w.BCH.Potential)
 	fmt.Printf(" ETH  │ %13.2f │ %14.2f \n", w.ETH.Ask, w.ETH.Potential)
 	fmt.Printf(" XRP  │ %13.2f │ %14.2f \n", w.XRP.Ask, w.XRP.Potential)
 	fmt.Printf("──────┼───────────────┼────────────────\n")
@@ -83,6 +85,12 @@ func (w *Wallet) updateAsks(ticker *krakenapi.TickerResponse) (err error) {
 		return err
 	}
 	w.BTC.Ask = float32(a)
+
+	a, err = strconv.ParseFloat(ticker.BCHEUR.Ask[0], 32)
+	if err != nil {
+		return err
+	}
+	w.BCH.Ask = float32(a)
 
 	a, err = strconv.ParseFloat(ticker.XETHZEUR.Ask[0], 32)
 	if err != nil {
@@ -108,6 +116,12 @@ func (w *Wallet) updateBalances(api *krakenapi.KrakenApi) (err error) {
 	}
 	w.BTC.Balance = float32(b)
 
+	b, err = strconv.ParseFloat(os.Getenv("BCH_BALANCE"), 32)
+	if err != nil {
+		return err
+	}
+	w.BCH.Balance = float32(b)
+
 	b, err = strconv.ParseFloat(os.Getenv("ETH_BALANCE"), 32)
 	if err != nil {
 		return err
@@ -120,12 +134,13 @@ func (w *Wallet) updateBalances(api *krakenapi.KrakenApi) (err error) {
 	}
 	w.XRP.Balance = float32(b)
 
-	if w.BTC.Balance == 0 && w.ETH.Balance == 0 && w.XRP.Balance == 0 {
+	if w.BTC.Balance == 0 && w.BCH.Balance == 0 && w.ETH.Balance == 0 && w.XRP.Balance == 0 {
 		b, err := api.Balance()
 		if err != nil {
 			return err
 		}
 		w.BTC.Balance = b.XXBT
+		w.BCH.Balance = b.BCH
 		w.ETH.Balance = b.XETH
 		w.XRP.Balance = b.XXRP
 	}
@@ -136,6 +151,9 @@ func (w *Wallet) updateBalances(api *krakenapi.KrakenApi) (err error) {
 func (w *Wallet) calculatePotential() (total float32, err error) {
 	// BTC (base currency)
 	w.BTC.Potential = w.BTC.Balance * w.BTC.Ask
+
+	// BCH
+	w.BCH.Potential = w.BCH.Balance * w.BCH.Ask
 
 	// ETH
 	w.ETH.Potential = w.ETH.Balance * w.ETH.Ask
@@ -159,7 +177,7 @@ func (w *Wallet) calculatePotential() (total float32, err error) {
 	balanceReference := float32(r)
 
 	// Total
-	total = (w.BTC.Potential + w.ETH.Potential + w.XRP.Potential) - (priceReference * balanceReference)
+	total = (w.BTC.Potential + w.BCH.Potential + w.ETH.Potential + w.XRP.Potential) - (priceReference * balanceReference)
 
 	return total, nil
 }
